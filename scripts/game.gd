@@ -1,5 +1,7 @@
 extends Node3D
 
+const HeroRoster = preload("res://scripts/hero_roster.gd")
+
 const TEAM_BLUE := 0
 const TEAM_RED := 1
 const LANE_Z := [-18.0, 0.0, 18.0]
@@ -17,6 +19,7 @@ var hud_label: Label
 var message_label: Label
 var attack_button: Button
 var move_vector := Vector2.ZERO
+var selected_hero := "assault"
 
 func _ready() -> void:
 	_build_world()
@@ -73,21 +76,21 @@ func _add_tower(team: int, pos: Vector3) -> void:
 	add_child(tower)
 
 func _spawn_armies() -> void:
-	player = _make_unit("Ranger", TEAM_BLUE, Vector3(-27, 0.9, 0), true)
+	player = _make_unit("Assault", TEAM_BLUE, Vector3(-27, 0.9, 0), true, selected_hero)
 	add_child(player)
 	units.append(player)
 	for i in range(4):
 		var z: float = LANE_Z[i % 3] + (1.8 if i % 2 == 0 else -1.8)
-		var ally := _make_unit("Ally_%d" % i, TEAM_BLUE, Vector3(-25.0 - float(i % 2) * 2.0, 0.9, z), false)
+		var ally_hero: String = HeroRoster.HERO_ORDER[i + 1]\n\t\tvar ally := _make_unit(HeroRoster.get_profile(ally_hero).display_name, TEAM_BLUE, Vector3(-25.0 - float(i % 2) * 2.0, 0.9, z), false, ally_hero)
 		add_child(ally)
 		units.append(ally)
 	for i in range(5):
 		var z: float = LANE_Z[i % 3] + (1.8 if i % 2 == 0 else -1.8)
-		var enemy := _make_unit("Enemy_%d" % i, TEAM_RED, Vector3(25.0 + float(i % 2) * 2.0, 0.9, z), false)
+		var enemy_hero: String = HeroRoster.HERO_ORDER[i % HeroRoster.HERO_ORDER.size()]\n\t\tvar enemy := _make_unit(HeroRoster.get_profile(enemy_hero).display_name, TEAM_RED, Vector3(25.0 + float(i % 2) * 2.0, 0.9, z), false, enemy_hero)
 		add_child(enemy)
 		units.append(enemy)
 
-func _make_unit(unit_name: String, team: int, pos: Vector3, is_player: bool) -> CharacterBody3D:
+func _make_unit(unit_name: String, team: int, pos: Vector3, is_player: bool, hero_id: String) -> CharacterBody3D:
 	var unit := CharacterBody3D.new()
 	unit.name = unit_name
 	unit.position = pos
@@ -138,7 +141,7 @@ func _bot_control(unit: CharacterBody3D, delta: float) -> void:
 		return
 	var offset: Vector3 = target.global_position - unit.global_position
 	var distance := offset.length()
-	if distance > ATTACK_RANGE * 0.72:
+	var unit_range: float = float(unit.get_meta("attack_range", ATTACK_RANGE))\n\tif distance > unit_range * 0.72:
 		var direction := Vector3(offset.x, 0, offset.z).normalized()
 		unit.velocity.x = direction.x * 4.2
 		unit.velocity.z = direction.z * 4.2
@@ -173,7 +176,7 @@ func _try_attack(unit: CharacterBody3D) -> void:
 
 func _nearest_enemy(unit: Node3D) -> Node3D:
 	var best: Node3D = null
-	var best_distance := ATTACK_RANGE
+	var best_distance: float = float(unit.get_meta("attack_range", ATTACK_RANGE))
 	for candidate in units:
 		if candidate == unit or not is_instance_valid(candidate) or not candidate.visible:
 			continue
@@ -218,7 +221,7 @@ func _build_hud() -> void:
 	hud_label.add_theme_color_override("font_color", Color.WHITE)
 	layer.add_child(hud_label)
 	message_label = Label.new()
-	message_label.text = "WAR FRONT  |  5V5 TRAINING"
+	message_label.text = "WAR FRONT  |  " + str(player.get_meta("hero_name", "ASSAULT")) + "  |  5V5 TRAINING"
 	message_label.position = Vector2(20, 50)
 	message_label.add_theme_font_size_override("font_size", 15)
 	layer.add_child(message_label)
