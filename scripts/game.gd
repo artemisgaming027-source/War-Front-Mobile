@@ -81,12 +81,14 @@ func _spawn_armies() -> void:
 	units.append(player)
 	for i in range(4):
 		var z: float = LANE_Z[i % 3] + (1.8 if i % 2 == 0 else -1.8)
-		var ally_hero: String = HeroRoster.HERO_ORDER[i + 1]\n\t\tvar ally := _make_unit(HeroRoster.get_profile(ally_hero).display_name, TEAM_BLUE, Vector3(-25.0 - float(i % 2) * 2.0, 0.9, z), false, ally_hero)
+		var ally_hero: String = HeroRoster.HERO_ORDER[i + 1]
+		var ally := _make_unit(HeroRoster.get_profile(ally_hero).display_name, TEAM_BLUE, Vector3(-25.0 - float(i % 2) * 2.0, 0.9, z), false, ally_hero)
 		add_child(ally)
 		units.append(ally)
 	for i in range(5):
 		var z: float = LANE_Z[i % 3] + (1.8 if i % 2 == 0 else -1.8)
-		var enemy_hero: String = HeroRoster.HERO_ORDER[i % HeroRoster.HERO_ORDER.size()]\n\t\tvar enemy := _make_unit(HeroRoster.get_profile(enemy_hero).display_name, TEAM_RED, Vector3(25.0 + float(i % 2) * 2.0, 0.9, z), false, enemy_hero)
+		var enemy_hero: String = HeroRoster.HERO_ORDER[i % HeroRoster.HERO_ORDER.size()]
+		var enemy := _make_unit(HeroRoster.get_profile(enemy_hero).display_name, TEAM_RED, Vector3(25.0 + float(i % 2) * 2.0, 0.9, z), false, enemy_hero)
 		add_child(enemy)
 		units.append(enemy)
 
@@ -95,8 +97,15 @@ func _make_unit(unit_name: String, team: int, pos: Vector3, is_player: bool, her
 	unit.name = unit_name
 	unit.position = pos
 	unit.set_meta("team", team)
-	unit.set_meta("hp", 220.0 if is_player else 150.0)
-	unit.set_meta("max_hp", 220.0 if is_player else 150.0)
+	var profile: Dictionary = HeroRoster.get_profile(hero_id)
+	unit.set_meta("hero_id", hero_id)
+	unit.set_meta("hero_name", profile.display_name)
+	unit.set_meta("move_speed", float(profile.move_speed))
+	unit.set_meta("attack_damage", float(profile.attack_damage))
+	unit.set_meta("attack_range", float(profile.attack_range))
+	unit.set_meta("attack_cooldown", float(profile.attack_cooldown))
+	unit.set_meta("hp", float(profile.max_hp))
+	unit.set_meta("max_hp", float(profile.max_hp))
 	unit.set_meta("is_player", is_player)
 	unit.set_meta("cooldown", randf_range(0.0, 0.8))
 	var body_color := Color(0.12, 0.36, 0.78) if team == TEAM_BLUE else Color(0.72, 0.16, 0.12)
@@ -126,8 +135,9 @@ func _player_control(unit: CharacterBody3D, delta: float) -> void:
 	direction.z = Input.get_action_strength("move_down") - Input.get_action_strength("move_up") + move_vector.y
 	if direction.length() > 1.0:
 		direction = direction.normalized()
-	unit.velocity.x = direction.x * HERO_SPEED
-	unit.velocity.z = direction.z * HERO_SPEED
+	var player_speed: float = float(unit.get_meta("move_speed", HERO_SPEED))
+	unit.velocity.x = direction.x * player_speed
+	unit.velocity.z = direction.z * player_speed
 	unit.velocity.y -= 22.0 * delta
 	unit.move_and_slide()
 	if direction.length() > 0.1:
@@ -141,10 +151,12 @@ func _bot_control(unit: CharacterBody3D, delta: float) -> void:
 		return
 	var offset: Vector3 = target.global_position - unit.global_position
 	var distance := offset.length()
-	var unit_range: float = float(unit.get_meta("attack_range", ATTACK_RANGE))\n\tif distance > unit_range * 0.72:
+	var unit_range: float = float(unit.get_meta("attack_range", ATTACK_RANGE))
+	if distance > unit_range * 0.72:
 		var direction := Vector3(offset.x, 0, offset.z).normalized()
-		unit.velocity.x = direction.x * 4.2
-		unit.velocity.z = direction.z * 4.2
+		var bot_speed: float = float(unit.get_meta("move_speed", 6.8)) * 0.62
+		unit.velocity.x = direction.x * bot_speed
+		unit.velocity.z = direction.z * bot_speed
 		unit.velocity.y -= 22.0 * delta
 		unit.move_and_slide()
 		unit.rotation.y = atan2(direction.x, direction.z)
@@ -158,10 +170,12 @@ func _try_attack(unit: CharacterBody3D) -> void:
 	if float(unit.get_meta("cooldown", 0.0)) > 0.0:
 		return
 	var target := _nearest_enemy(unit)
-	if target == null or unit.global_position.distance_to(target.global_position) > ATTACK_RANGE:
+	var unit_range: float = float(unit.get_meta("attack_range", ATTACK_RANGE))
+	if target == null or unit.global_position.distance_to(target.global_position) > unit_range:
 		return
-	target.set_meta("hp", float(target.get_meta("hp")) - ATTACK_DAMAGE)
-	unit.set_meta("cooldown", 0.85)
+	var damage: float = float(unit.get_meta("attack_damage", ATTACK_DAMAGE))
+	target.set_meta("hp", float(target.get_meta("hp")) - damage)
+	unit.set_meta("cooldown", float(unit.get_meta("attack_cooldown", 0.85)))
 	var bar: MeshInstance3D = target.get_meta("hp_bar")
 	var ratio: float = clampf(float(target.get_meta("hp")) / float(target.get_meta("max_hp")), 0.0, 1.0)
 	bar.scale.x = maxf(0.02, ratio)
